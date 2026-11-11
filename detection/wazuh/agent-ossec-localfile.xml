@@ -8,3 +8,9 @@
   <location>/opt/cloud-sec-lab/infra/logs/modsecurity/audit.log</location>
   <label key="log_source">modsecurity</label>
 </localfile>
+
+<!-- Phase 2: Suricata alerts only (full eve.json is kept on the target for the ML phase) -->
+<localfile>
+  <log_format>json</log_format>
+  <location>/var/log/suricata/eve-alerts.json</location>
+</localfile>
