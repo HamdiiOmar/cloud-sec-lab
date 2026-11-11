@@ -14,7 +14,7 @@ Attack it, watch it, detect it, block it, learn. Full architecture: [docs/cloud-
 ## Build order
 1. **Lab base**: Compose + Wazuh up ✅
 2. **Signatures**: CRS + Suricata rules ✅
-3. **Health**: Prometheus, Grafana
+3. **Health**: Prometheus, Grafana ✅
 4. **SOAR**: Shuffle blocks IPs
 5. **ML loop**: train, score, retrain
 6. **DevSecOps**: CI scans, Terraform

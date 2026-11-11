@@ -1,0 +1,31 @@
+# Phase 3: metrics exporters. Run on the TARGET VM:  docker compose up -d
+# Prometheus (on the host) scrapes these over the host-only lab network.
+
+services:
+  node-exporter:                  # host CPU, RAM, disk, network
+    image: prom/node-exporter:v1.12.1
+    restart: unless-stopped
+    network_mode: host            # listens on :9100, sees the real host interfaces
+    pid: host
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:                       # per-container CPU, RAM, network
+    image: ghcr.io/google/cadvisor:v0.60.6
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=15s

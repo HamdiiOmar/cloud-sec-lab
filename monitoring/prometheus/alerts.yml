@@ -1,0 +1,38 @@
+groups:
+  - name: lab-health
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.job }} on {{ $labels.instance }} is not responding"
+
+      # Busy / total, not "100 - idle": VirtualBox guests undercount CPU time, which inflates the usual formula.
+      - alert: HighCPU
+        expr: sum by (instance) (rate(node_cpu_seconds_total{mode!="idle"}[2m])) / sum by (instance) (rate(node_cpu_seconds_total[2m])) * 100 > 85
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "CPU above 85% on {{ $labels.instance }} for 5 minutes"
+
+      - alert: LowMemory
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Less than 10% RAM available on {{ $labels.instance }}"
+
+      - alert: DiskAlmostFull
+        expr: (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}) * 100 > 85
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Root disk above 85% on {{ $labels.instance }}"
+
+      - alert: ContainerDown
+        expr: absent(container_last_seen{name=~".*juice-shop.*"}) or absent(container_last_seen{name=~".*waf.*"})
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "Juice Shop or WAF container is not running"
