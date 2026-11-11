@@ -1,0 +1,29 @@
+# Phase 1: vulnerable app behind NGINX + ModSecurity (OWASP CRS)
+# Run on the target VM:  docker compose up -d
+# Only the WAF is published; Juice Shop is reachable only through it.
+
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    restart: unless-stopped
+    expose:
+      - "3000"
+
+  waf:
+    image: owasp/modsecurity-crs:nginx
+    restart: unless-stopped
+    depends_on:
+      - juice-shop
+    ports:
+      - "${WAF_PORT:-80}:8080"            # image listens on 8080 (non-root)
+    environment:
+      BACKEND: http://juice-shop:3000
+      BLOCKING_PARANOIA: 1                # CRS paranoia level (1 = fewest false positives)
+      ANOMALY_INBOUND: 5                  # block when inbound anomaly score >= 5
+      MODSEC_RULE_ENGINE: "on"            # "DetectionOnly" = log but don't block
+      MODSEC_AUDIT_LOG: /var/log/modsecurity/audit.log  # default is stdout
+      MODSEC_AUDIT_LOG_FORMAT: JSON
+      MODSEC_AUDIT_LOG_TYPE: Serial       # one JSON object per line
+      MODSEC_AUDIT_ENGINE: RelevantOnly   # only log 4xx (except 404) and 5xx
+    volumes:
+      - ./logs/modsecurity:/var/log/modsecurity   # host dir must be writable by uid 101

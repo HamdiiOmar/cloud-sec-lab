@@ -1,0 +1,37 @@
+<!--
+  Custom rules for the lab. Copy to /var/ossec/etc/rules/local_rules.xml on the WAZUH MANAGER,
+  then: sudo systemctl restart wazuh-manager
+  Test without restarting: /var/ossec/bin/wazuh-logtest  (paste one line of audit.log)
+  Lab rule IDs: 100100-100199 = ModSecurity / WAF
+-->
+<group name="modsecurity,web,attack,">
+
+  <!-- Base: any ModSecurity JSON audit entry -->
+  <rule id="100100" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="transaction.client_ip">\.+</field>
+    <field name="transaction.request.uri">\.+</field>
+    <description>ModSecurity: audit event from $(transaction.client_ip)</description>
+  </rule>
+
+  <!-- Request blocked by the WAF (CRS anomaly threshold reached) -->
+  <rule id="100101" level="10">
+    <if_sid>100100</if_sid>
+    <field name="transaction.response.http_code">^403$</field>
+    <description>ModSecurity: blocked request from $(transaction.client_ip) to $(transaction.request.uri)</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- SQL injection (CRS 942xxx) -->
+  <rule id="100102" level="12">
+    <if_sid>100101</if_sid>
+    <match>"ruleId":"942</match>
+    <description>ModSecurity: SQL injection blocked from $(transaction.client_ip)</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+</group>

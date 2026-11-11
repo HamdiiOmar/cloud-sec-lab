@@ -1,0 +1,10 @@
+<!--
+  Add inside <ossec_config> in /var/ossec/etc/ossec.conf on the TARGET VM (Wazuh agent),
+  then: sudo systemctl restart wazuh-agent
+  Path = where infra/docker-compose.yml mounts the WAF logs on that VM; adjust if the repo lives elsewhere.
+-->
+<localfile>
+  <log_format>json</log_format>
+  <location>/opt/cloud-sec-lab/infra/logs/modsecurity/audit.log</location>
+  <label key="log_source">modsecurity</label>
+</localfile>
