@@ -82,4 +82,20 @@ SSH brute force (hydra) caught by Wazuh's built-in sshd rules:
 | 100110 / 100111 | 8 / 12 | Scan signature / 4+ scan alerts in 60s (port scan) |
 | 5760 / 5763 | 5 / 10 | sshd failed login / SSH brute force (built-in) |
 
+## Phase 3: health and usage monitoring
+
+node_exporter and cAdvisor on the target expose host and per-container metrics; Prometheus scrapes them every 15s and Grafana shows them on a provisioned "Lab health" dashboard. Setup: [docs/phase3-health.md](docs/phase3-health.md).
+
+![Grafana Lab health dashboard](docs/screenshots/10-grafana-lab-health.png)
+
+All scrape targets up:
+
+![Prometheus targets](docs/screenshots/11-prometheus-targets.png)
+
+Five alert rules (exporter down, high CPU, low memory, disk almost full, app container down). `TargetDown` was tested by stopping cAdvisor: it fired after a minute and cleared on restart.
+
+![Prometheus alert rules](docs/screenshots/12-prometheus-rules.png)
+
+CPU uses busy ÷ total time rather than `100 - idle`: on this VirtualBox guest the CPU counters undercount, and the usual formula showed 50-80% for a VM that `top` showed at 2-4%.
+
 > Keep the lab on an isolated network. Only attack systems you own. Plan for ~16 GB RAM (Wazuh alone needs ~8 GB).
