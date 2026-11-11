@@ -55,4 +55,31 @@ The Wazuh agent ships the WAF's JSON audit log, and custom rules ([detection/waz
 | 100101 | 10 | Request blocked (403) |
 | 100102 | 12 | SQL injection blocked (CRS 942xxx) |
 
+## Phase 2: signatures (network IDS + correlation)
+
+Suricata 8 with the ET Open ruleset (~53k signatures) watches the lab network, and new Wazuh rules correlate repeated events into one high-severity alert. Setup and tests: [docs/phase2-signatures.md](docs/phase2-signatures.md).
+
+A port scan from Kali raises scan alerts, then a single level-12 "port scan" once 4+ fire in 60s:
+
+![nmap port scan](docs/screenshots/06-nmap-scan.png)
+
+Repeated failed Juice Shop logins (level 5), which aggregate into a level-12 brute-force alert:
+
+![failed logins](docs/screenshots/07-failed-logins.png)
+
+nikto trips the WAF repeatedly, raising a level-13 "automated attack" alert:
+
+![nikto automated attack](docs/screenshots/08-nikto-automated.png)
+
+SSH brute force (hydra) caught by Wazuh's built-in sshd rules:
+
+![ssh brute force](docs/screenshots/09-ssh-bruteforce.png)
+
+| Rule | Level | Fires on |
+|---|---|---|
+| 100103 | 13 | 10+ WAF blocks in 60s from one IP (sqlmap, nikto) |
+| 100104 / 100105 | 5 / 12 | Failed login / 10+ failures in 60s (brute force) |
+| 100110 / 100111 | 8 / 12 | Scan signature / 4+ scan alerts in 60s (port scan) |
+| 5760 / 5763 | 5 / 10 | sshd failed login / SSH brute force (built-in) |
+
 > Keep the lab on an isolated network. Only attack systems you own. Plan for ~16 GB RAM (Wazuh alone needs ~8 GB).
