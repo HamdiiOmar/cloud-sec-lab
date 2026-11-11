@@ -1,0 +1,8 @@
+.env
+*.pyc
+__pycache__/
+.venv/
+mlruns/
+*.pkl
+*.tfstate*
+.terraform/
