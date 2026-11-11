@@ -6,33 +6,44 @@ Deliverable: an attack sent from Kali is blocked by the WAF and shows up as an a
 
 | VM | IP | RAM | Role |
 |---|---|---|---|
-| Wazuh | 192.168.56.10 | 8 GB, 4 vCPU, 50 GB disk | Wazuh all-in-one (manager + indexer + dashboard) |
-| Target (Ubuntu Server 24.04) | 192.168.56.20 | 4 GB, 2 vCPU | Docker stack + Wazuh agent |
-| Kali | 192.168.56.30 | 2-4 GB | Attacker |
+| Wazuh (official OVA) | 192.168.56.104 (DHCP) | 8 GB, 4 vCPU | Wazuh all-in-one (manager + indexer + dashboard) |
+| Target (Ubuntu-Target, 26.04) | 192.168.56.40 (static) | 4 GB, 2 vCPU, 40 GB disk | Docker stack + Wazuh agent |
+| Kali | 192.168.56.103 (DHCP) | 4 GB | Attacker |
 
-Each VM: adapter 1 = host-only `vboxnet0` (lab traffic), adapter 2 = NAT (internet for installs only).
+Each VM has a host-only `vboxnet0` adapter (lab traffic) and a NAT adapter (internet for installs only).
 
 ## 1. Wazuh VM
 
+Import the official appliance instead of installing by hand:
 ```bash
-curl -sO https://packages.wazuh.com/4.14/wazuh-install.sh
-sudo bash ./wazuh-install.sh -a        # prints the admin password at the end, save it
+curl -fLO https://packages.wazuh.com/4.x/vm/wazuh-4.14.10.ova
+VBoxManage import wazuh-4.14.10.ova --vsys 0 --vmname Wazuh
+VBoxManage modifyvm Wazuh --nic1 hostonly --hostonlyadapter1 vboxnet0 --nic2 nat --graphicscontroller vmsvga
+VBoxManage startvm Wazuh --type headless
 ```
-Check: open `https://192.168.56.10` from the host and log in as `admin`.
+Check: about a minute after boot, `https://192.168.56.104` shows the login page. Change the default passwords on first login.
 
 ## 2. Target VM: web stack
 
+Target fixes needed on Ubuntu 26.04 + VirtualBox NAT:
+- `echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4` (apt tried IPv6 with no IPv6 route)
+- `/etc/netplan/60-nat.yaml`: NAT adapter `enp0s8` with `dhcp4: true`, `use-dns: false`, nameservers 1.1.1.1 / 8.8.8.8 (VirtualBox's DNS relay 10.0.3.3 is flaky)
+
+The repo is private, so copy it from the host instead of cloning:
 ```bash
-sudo git clone https://github.com/HamdiiOmar/cloud-sec-lab.git /opt/cloud-sec-lab
+git archive HEAD | ssh soc-target@192.168.56.40 'mkdir -p /opt/cloud-sec-lab && tar -x -C /opt/cloud-sec-lab'
+```
+Then on the target:
+```bash
 cd /opt/cloud-sec-lab/infra
 sudo mkdir -p logs/modsecurity && sudo chown 101:101 logs/modsecurity   # WAF runs as uid 101
 sudo docker compose up -d
 ```
 Check, from Kali:
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' http://192.168.56.20/                                      # 200
-curl -s -o /dev/null -w '%{http_code}\n' 'http://192.168.56.20/?q=<script>alert(1)</script>'          # 403
-curl -s -o /dev/null -w '%{http_code}\n' -G --data-urlencode "q=' OR 1=1--" http://192.168.56.20/rest/products/search   # 403
+curl -s -o /dev/null -w '%{http_code}\n' http://192.168.56.40/                                      # 200
+curl -s -o /dev/null -w '%{http_code}\n' 'http://192.168.56.40/?q=<script>alert(1)</script>'          # 403
+curl -s -o /dev/null -w '%{http_code}\n' -G --data-urlencode "q=' OR 1=1--" http://192.168.56.40/rest/products/search   # 403
 ```
 Then on the target: `tail -1 logs/modsecurity/audit.log` shows one JSON line per blocked request.
 
@@ -41,7 +52,7 @@ Then on the target: `tail -1 logs/modsecurity/audit.log` shows one JSON line per
 ```bash
 curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | sudo gpg --dearmor -o /usr/share/keyrings/wazuh.gpg
 echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" | sudo tee /etc/apt/sources.list.d/wazuh.list
-sudo apt update && sudo WAZUH_MANAGER=192.168.56.10 apt install -y wazuh-agent=4.14.10-1
+sudo apt update && sudo WAZUH_MANAGER=192.168.56.104 apt install -y wazuh-agent=4.14.10-1
 ```
 Paste the block from `detection/wazuh/agent-ossec-localfile.xml` inside `<ossec_config>` in `/var/ossec/etc/ossec.conf`, then:
 ```bash
