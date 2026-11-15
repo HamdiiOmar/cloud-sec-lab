@@ -1,0 +1,19 @@
+#!/usr/sbin/nft -f
+# Phase 4: SOAR block-list on the target VM.
+# Our own table, separate from Docker's iptables-nft tables, so Docker restarts never touch it.
+# Hook prerouting at priority -350 = before Docker's raw (-300) and DNAT (-100),
+# so it also drops traffic to Docker-published ports (the WAF on :80).
+
+table inet lab_block {
+	set blocklist {
+		type ipv4_addr
+		flags timeout
+		timeout 10m            # default ban length; entries expire on their own
+		comment "IPs blocked by Shuffle"
+	}
+
+	chain prerouting {
+		type filter hook prerouting priority -350; policy accept;
+		ip saddr @blocklist counter drop
+	}
+}

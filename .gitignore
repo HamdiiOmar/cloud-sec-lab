@@ -7,3 +7,8 @@ mlruns/
 *.tfstate*
 .terraform/
 infra/logs/
+soar/.keys/
+soar/shuffle/.env
+soar/shuffle/shuffle-apps/
+soar/shuffle/shuffle-files/
+soar/shuffle/shuffle-database/
