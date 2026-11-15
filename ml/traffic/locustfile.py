@@ -19,13 +19,29 @@ REVIEWS = [
     "My kids love it!", "Fresh and natural taste.", "Good value for money.", "Packaging could be better.",
     "Nice design, comfy fit.", "Five stars from me.", "Not bad at all.",
 ]
-BROWSERS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
-    "Mozilla/5.0 (X11; Linux x86_64; rv:144.0) Gecko/20100101 Firefox/144.0",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
-]
+def random_browser():
+    """A realistic user agent from a wide spread of browsers and versions (old ones too).
+    With only 5 fixed modern strings (first version) the classifier learned "unfamiliar browser = attacker"."""
+    r = random.random()
+    win = random.choice(["Windows NT 10.0; Win64; x64", "Windows NT 10.0; WOW64", "Windows NT 6.1; Win64; x64"])
+    mac = f"Macintosh; Intel Mac OS X {random.choice(['10_15_7', '11_6', '12_6', '13_5', '14_6', '15_1'])}"
+    if r < 0.45:                                   # Chrome / Chromium, versions 88-142
+        v = random.randint(88, 142)
+        plat = random.choice([win, win, mac, "X11; Linux x86_64", f"Linux; Android {random.randint(9, 15)}; {random.choice(['Pixel 7', 'SM-G991B', 'Pixel 9', 'Redmi Note 12'])}"])
+        mobile = " Mobile" if "Android" in plat else ""
+        return f"Mozilla/5.0 ({plat}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{v}.0.{random.randint(4000, 7400)}.{random.randint(10, 200)}{mobile} Safari/537.36"
+    if r < 0.65:                                   # Firefox 78-144
+        v = random.randint(78, 144)
+        plat = random.choice([win, mac.replace("_", "."), "X11; Linux x86_64", "X11; Ubuntu; Linux x86_64"])
+        return f"Mozilla/5.0 ({plat}; rv:{v}.0) Gecko/20100101 Firefox/{v}.0"
+    if r < 0.85:                                   # Safari, macOS and iOS 13-18
+        v = random.randint(13, 18)
+        if random.random() < 0.5:
+            return f"Mozilla/5.0 (iPhone; CPU iPhone OS {v}_{random.randint(0, 6)} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/{v}.{random.randint(0, 6)} Mobile/15E148 Safari/604.1"
+        return f"Mozilla/5.0 ({mac}) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/{v}.{random.randint(0, 6)} Safari/605.1.15"
+    v = random.randint(88, 142)                    # Edge
+    return f"Mozilla/5.0 ({win}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{v}.0.0.0 Safari/537.36 Edg/{v}.0.{random.randint(1000, 3000)}.{random.randint(10, 99)}"
+
 
 
 def rand_str(n):
@@ -36,8 +52,10 @@ class Shopper(HttpUser):
     wait_time = between(2, 8)          # think time between actions
 
     def on_start(self):
-        self.client.headers["User-Agent"] = random.choice(BROWSERS)
+        self.client.headers["User-Agent"] = random_browser()
         self.client.headers["Accept-Language"] = random.choice(["en-US,en;q=0.9", "fr-FR,fr;q=0.8", "de-DE,de;q=0.7"])
+        if random.random() < 0.6:                  # browsers send a Referer when navigating inside the app
+            self.client.headers["Referer"] = "http://192.168.56.40/"
         self.token, self.basket_id, self.items, self.products = None, None, [], []
         # Wait for the target instead of dying: an exception here kills the user for good,
         # which is what happened when the host rebooted before the target VM was back.

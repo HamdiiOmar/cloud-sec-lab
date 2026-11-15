@@ -66,6 +66,8 @@ def load_events(windows):
             label = next((w["type"] for w in windows if w["src"] == src and w["start"] <= t <= w["end"]), None)
             if label is None:
                 continue
+        if "request_headers" not in ev.get("http", {}):
+            continue      # v3 features need the request headers (logged since Phase 5); older events can't show header attacks
         f = extract(ev.get("http", {}))
         f.update(_label=label, _time=t, _src=src)
         rows.append(f)

@@ -11,7 +11,7 @@ import re
 from collections import Counter
 from urllib.parse import unquote_plus, urlsplit
 
-FEATURE_VERSION = 2   # v2: encoded-character features ignore encoded spaces (normal multi-word searches)
+FEATURE_VERSION = 3   # v2: ignore encoded spaces; v3: request-header features, no user-agent length
 
 METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
 SPECIAL = {
@@ -31,6 +31,27 @@ KEYWORDS = {
 KEYWORD_RE = {k: re.compile(v, re.I) for k, v in KEYWORDS.items()}
 ENC_SPECIAL = re.compile(r"%(?!20)[0-9a-fA-F]{2}")
 TOOL_RE = re.compile(r"sqlmap|nikto|hydra|nmap|masscan|gobuster|dirbuster|wfuzz|ffuf|nuclei|zgrab|curl/|python-requests|go-http-client|wget/", re.I)
+
+
+# Headers whose values are scanned for payloads. Skipped: Host, Content-Length, Accept*, and Authorization
+# (a JWT: long, base64, and different for every user).
+SCANNED_HEADERS = {"user-agent", "referer", "cookie", "x-forwarded-for", "x-real-ip", "origin", "x-requested-with",
+                   "client-ip", "true-client-ip", "x-forwarded-host", "forwarded", "via", "content-type"}
+HDR_SPECIAL = re.compile(r"""['"<>`${}|]|--""")
+
+
+def header_values(http: dict) -> str:
+    """Values of the scanned headers, plus any header we don't know (custom headers are a classic injection spot)."""
+    known_benign = {"host", "content-length", "accept", "accept-language", "accept-encoding", "authorization",
+                    "connection", "cache-control", "pragma", "upgrade-insecure-requests", "te", "priority",
+                    "sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site", "sec-fetch-user", "if-none-match",
+                    "if-modified-since", "dnt"}
+    vals = []
+    for h in http.get("request_headers") or []:
+        name = (h.get("name") or "").lower()
+        if name in SCANNED_HEADERS or name not in known_benign:
+            vals.append(unquote_plus(h.get("value") or ""))
+    return "\n".join(vals)
 
 
 def entropy(s: str) -> float:
@@ -68,11 +89,17 @@ def extract(http: dict) -> dict:
         "dash_dash": dec.count("--"),
         "spaces": int(unquote_plus(query).count(" ") > 3),   # a few words = search; many = injected statement
         "has_body_type_json": int("json" in (http.get("http_content_type") or "")),
-        "ua_len": len(ua),
+        # No user-agent length: in v2 the classifier used it to tell Locust's few modern browsers from
+        # sqlmap's random old ones, a shortcut a real attacker with a current browser string would beat.
         "ua_browser": int(ua.startswith("Mozilla/")),
         "ua_tool": int(bool(TOOL_RE.search(ua))),
         "ua_empty": int(not ua),
     }
+    hv = header_values(http)
+    f["hdr_special"] = len(HDR_SPECIAL.findall(hv))
+    for name, rx in KEYWORD_RE.items():
+        if name != "probe":
+            f[f"hdr_kw_{name}"] = len(rx.findall(hv))
     for name, ch in SPECIAL.items():
         f[f"c_{name}"] = dec.count(ch)
     for name, rx in KEYWORD_RE.items():

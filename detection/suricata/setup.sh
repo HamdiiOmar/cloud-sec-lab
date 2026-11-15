@@ -20,6 +20,11 @@ sed -i "s#^\(\s*HOME_NET:\).*#\1 \"$HOME_NET\"#" "$CONF"
 # Capture on the lab interface (default is eth0, which doesn't exist here)
 sed -i "0,/^  - interface: eth0/s//  - interface: $IFACE/" "$CONF"
 
+# Phase 5: log every request header in eve.json, so the ML model can see payloads hidden in
+# User-Agent / Referer / Cookie (sqlmap --level 3 injects there; the URL alone looks clean)
+sed -i 's/^\(\s*\)# dump-all-headers: none$/\1dump-all-headers: request/' "$CONF"
+grep -q '^\s*dump-all-headers: request$' "$CONF" || { echo "could not enable dump-all-headers"; exit 1; }
+
 # Extra, alerts-only EVE file for Wazuh; the full eve.json stays for the ML phase
 sed -i '/^outputs:/a\
   - eve-log:\
