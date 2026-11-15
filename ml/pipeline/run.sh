@@ -33,7 +33,8 @@ HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose run --rm --build trainer
 SHA=$(sha256sum models/model.joblib | cut -d' ' -f1)
 if [ "$SHA" != "$(cat data/.deployed_sha 2>/dev/null)" ]; then
 	scp -q models/model.joblib "$TARGET:/tmp/model.joblib"
-	$SSH "sudo install -o 10001 -g 10001 -m 644 /tmp/model.joblib /var/lib/lab-ml/models/model.joblib.new \
+	$SSH "sudo install -m 644 /tmp/model.joblib /var/lib/lab-ml/models/model.joblib.new \
+	      && sudo chown 10001:10001 /var/lib/lab-ml/models/model.joblib.new \
 	      && sudo mv /var/lib/lab-ml/models/model.joblib.new /var/lib/lab-ml/models/model.joblib && rm /tmp/model.joblib"
 	echo "$SHA" > data/.deployed_sha
 	echo "deployed new model"

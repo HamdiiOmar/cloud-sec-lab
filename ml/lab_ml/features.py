@@ -11,7 +11,7 @@ import re
 from collections import Counter
 from urllib.parse import unquote_plus, urlsplit
 
-FEATURE_VERSION = 1
+FEATURE_VERSION = 2   # v2: encoded-character features ignore encoded spaces (normal multi-word searches)
 
 METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
 SPECIAL = {
@@ -29,6 +29,7 @@ KEYWORDS = {
              r"/(wp-|admin|phpmyadmin|cgi-bin|actuator|server-status|console|manager/html)",
 }
 KEYWORD_RE = {k: re.compile(v, re.I) for k, v in KEYWORDS.items()}
+ENC_SPECIAL = re.compile(r"%(?!20)[0-9a-fA-F]{2}")
 TOOL_RE = re.compile(r"sqlmap|nikto|hydra|nmap|masscan|gobuster|dirbuster|wfuzz|ffuf|nuclei|zgrab|curl/|python-requests|go-http-client|wget/", re.I)
 
 
@@ -54,16 +55,18 @@ def extract(http: dict) -> dict:
         "query_len": len(query),
         "path_depth": path.count("/"),
         "n_params": len([p for p in query.split("&") if p]) if query else 0,
-        "pct_encoded": raw.count("%"),
-        "pct_ratio": raw.count("%") / max(len(raw), 1),
+        # Encoded characters, except spaces: "%20"/"+" is ordinary multi-word search input (v1 counted it and
+        # flagged searches like "apple pomace"); encoded quotes, brackets, slashes, "%25" are what attackers send.
+        "pct_encoded": len(ENC_SPECIAL.findall(raw)),
+        "pct_ratio": len(ENC_SPECIAL.findall(raw)) / max(len(raw), 1),
         "digit_ratio": sum(c.isdigit() for c in dec) / max(len(dec), 1),
         "upper_ratio": sum(c.isupper() for c in dec) / max(len(dec), 1),
-        "nonalnum_ratio": sum(not c.isalnum() and c not in "/?&=._-" for c in dec) / max(len(dec), 1),
+        "nonalnum_ratio": sum(not c.isalnum() and c not in "/?&=._- " for c in dec) / max(len(dec), 1),
         "query_entropy": entropy(unquote_plus(query)),
         "max_param_len": max((len(p) for p in query.split("&")), default=0) if query else 0,
         "dotdot": dec.count(".."),
         "dash_dash": dec.count("--"),
-        "spaces": dec.count(" "),
+        "spaces": int(unquote_plus(query).count(" ") > 3),   # a few words = search; many = injected statement
         "has_body_type_json": int("json" in (http.get("http_content_type") or "")),
         "ua_len": len(ua),
         "ua_browser": int(ua.startswith("Mozilla/")),

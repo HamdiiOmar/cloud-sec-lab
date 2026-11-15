@@ -89,9 +89,11 @@ def main():
     if counts.get("normal", 0) < MIN_NORMAL:
         sys.exit(f"only {counts.get('normal', 0)} normal requests, need {MIN_NORMAL}: let the traffic generator run longer")
 
-    # Time-based split: the newest 20% is the test set
-    cut = df["_time"].quantile(0.8)
-    train, test = df[df["_time"] <= cut], df[df["_time"] > cut]
+    # Time-based split per label: the newest 20% of EACH label is the test set. A single global time cut
+    # (first version) put every attack in train, because attacks come in short bursts.
+    parts = [g.iloc[: int(len(g) * 0.8)] for _, g in df.groupby("_label")]
+    train = pd.concat(parts).sort_values("_time")
+    test = df.drop(train.index)
     X = lambda d: d[FEATURE_NAMES].to_numpy(dtype=float)
     normal_tr = train[train["_label"] == "normal"]
 
