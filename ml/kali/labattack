@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Phase 5: run an attack from Kali and record it as a labeled time window for ML training.
+#   labattack <type> <command...>
+#   labattack sqli   sqlmap -u "http://192.168.56.40/rest/products/search?q=apple" --batch
+#   labattack scan   nikto -h http://192.168.56.40 -maxtime 120s
+# Types are free text; keep them consistent (sqli, xss, traversal, scan, bruteforce, cmdi, ...).
+# Needs LAB_TOKEN in the environment (same value as LABEL_TOKEN on the ML service).
+set -uo pipefail
+API=${LAB_ML_API:-http://192.168.56.40:8000}
+[ $# -ge 2 ] || { echo "usage: labattack <type> <command...>"; exit 2; }
+[ -n "${LAB_TOKEN:-}" ] || { echo "set LAB_TOKEN first"; exit 2; }
+TYPE=$1; shift
+SRC=$(ip -4 route get 192.168.56.40 | grep -oP 'src \K[\d.]+')
+
+ID=$(curl -sf -m 5 -X POST "$API/labels/start" -H "X-Label-Token: $LAB_TOKEN" -H 'Content-Type: application/json' \
+      -d "$(jq -nc --arg t "$TYPE" --arg s "$SRC" --arg c "$*" '{type:$t, src_ip:$s, command:$c}')" | jq -r .id)
+[ -n "$ID" ] && [ "$ID" != null ] || { echo "could not record the label start (ML service down?)"; exit 1; }
+echo "[labattack] window $ID started: type=$TYPE src=$SRC"
+
+"$@"
+RC=$?
+END=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)
+
+# The attack often gets Kali auto-blocked (Phase 4), so retry the end record for up to 20 minutes.
+send_end() {
+	for _ in $(seq 40); do
+		curl -sf -m 5 -X POST "$API/labels/$ID/end" -H "X-Label-Token: $LAB_TOKEN" -H 'Content-Type: application/json' \
+			-d "{\"end\":\"$END\"}" >/dev/null && { echo "[labattack] window $ID closed at $END"; return; }
+		sleep 30
+	done
+	echo "[labattack] could not close window $ID; training caps open windows at 15 minutes"
+}
+if curl -sf -m 5 -X POST "$API/labels/$ID/end" -H "X-Label-Token: $LAB_TOKEN" -H 'Content-Type: application/json' \
+		-d "{\"end\":\"$END\"}" >/dev/null; then
+	echo "[labattack] window $ID closed at $END"
+else
+	echo "[labattack] target unreachable (blocked?), closing the window in the background"
+	send_end > /tmp/labattack-$ID.log 2>&1 &
+	disown
+fi
+exit $RC

@@ -12,3 +12,7 @@ soar/shuffle/.env
 soar/shuffle/shuffle-apps/
 soar/shuffle/shuffle-files/
 soar/shuffle/shuffle-database/
+ml/.env
+ml/data/
+ml/models/
+ml/mlflow-data/

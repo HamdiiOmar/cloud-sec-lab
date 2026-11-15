@@ -1,0 +1,15 @@
+# User-level unit (no root needed). Install:
+#   mkdir -p ~/.config/systemd/user && cp infra/host/lab-up.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable lab-up.service
+[Unit]
+Description=Cloud security lab: recreate vboxnet0 and restart Shuffle backend
+After=default.target
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sh -c 'until docker info >/dev/null 2>&1; do sleep 2; done'
+ExecStart=%h/cloud-sec-lab/infra/host/lab-up.sh
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

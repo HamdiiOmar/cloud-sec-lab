@@ -1,0 +1,23 @@
+# Phase 5: ML scoring service on the TARGET VM.
+#   cd /opt/cloud-sec-lab/ml && docker compose -f docker-compose.target.yml up -d --build
+# Needs ml/.env with LABEL_TOKEN=... (gitignored).
+
+services:
+  lab-ml:
+    build: .
+    image: lab-ml:local
+    restart: unless-stopped
+    ports:
+      - "8000:8000"                     # /score, /labels (Kali), /metrics (Prometheus)
+    env_file: .env
+    environment:
+      EVE_PATH: /var/log/suricata/eve.json
+      ALERT_PATH: /data/ml-alerts.json  # shipped by the Wazuh agent
+      LABELS_PATH: /data/labels.jsonl
+      MODEL_PATH: /models/model.joblib  # dropped here by the retraining job
+    volumes:
+      - /var/log/suricata:/var/log/suricata:ro
+      - /var/lib/lab-ml/data:/data
+      - /var/lib/lab-ml/models:/models:ro
+      - ./kali/labattack:/app/service/labattack:ro
+    mem_limit: 512m
