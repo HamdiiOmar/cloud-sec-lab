@@ -63,9 +63,10 @@ def load_events(windows):
         if src == NORMAL_SRC:
             label = "normal"
         else:
-            label = next((w["type"] for w in windows if w["src"] == src and w["start"] <= t <= w["end"]), None)
-            if label is None:
-                continue
+            types = {w["type"] for w in windows if w["src"] == src and w["start"] <= t <= w["end"]}
+            if len(types) != 1:
+                continue      # outside any window, or inside overlapping windows of different types: ambiguous
+            label = types.pop()
         if "request_headers" not in ev.get("http", {}):
             continue      # v3 features need the request headers (logged since Phase 5); older events can't show header attacks
         f = extract(ev.get("http", {}))
