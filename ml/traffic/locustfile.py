@@ -38,8 +38,14 @@ class Shopper(HttpUser):
     def on_start(self):
         self.client.headers["User-Agent"] = random.choice(BROWSERS)
         self.client.headers["Accept-Language"] = random.choice(["en-US,en;q=0.9", "fr-FR,fr;q=0.8", "de-DE,de;q=0.7"])
-        self.token, self.basket_id, self.items = None, None, []
-        self.products = self.client.get("/api/Products", name="/api/Products").json().get("data", [])
+        self.token, self.basket_id, self.items, self.products = None, None, [], []
+        # Wait for the target instead of dying: an exception here kills the user for good,
+        # which is what happened when the host rebooted before the target VM was back.
+        while not self.products:
+            try:
+                self.products = self.client.get("/api/Products", name="/api/Products").json().get("data", [])
+            except Exception:
+                time.sleep(30)
         self.email = f"{rand_str(8)}@{random.choice(['gmail.com', 'outlook.com', 'yahoo.fr', 'proton.me'])}"
         self.password = rand_str(10) + "A1!"
         r = self.client.post("/api/Users", name="/api/Users (register)", json={

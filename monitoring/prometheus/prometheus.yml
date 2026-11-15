@@ -21,3 +21,9 @@ scrape_configs:
       - targets: ["192.168.56.40:8081"]
         labels:
           vm: ubuntu-target
+
+  - job_name: lab-ml               # Phase 5: ML scoring service
+    static_configs:
+      - targets: ["192.168.56.40:8000"]
+        labels:
+          vm: ubuntu-target

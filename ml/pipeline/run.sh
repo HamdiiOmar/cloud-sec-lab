@@ -8,15 +8,17 @@ SSH="ssh -o BatchMode=yes $TARGET"
 mkdir -p data models
 echo "== $(date -Is) ML loop"
 
-# 1. Collect: HTTP events newer than the last run (current + rotated eve.json), and the attack labels
+# 1. Collect: HTTP events newer than the last run (current + rotated eve.json), and the attack labels.
+#    Only port 80 (the web app the model protects; not Prometheus scrapes or the ML API itself).
+#    -R + fromjson? skips half-written lines (e.g. the target VM was killed mid-write) instead of aborting.
 LAST=$(cat data/.last_ts 2>/dev/null || echo "1970-01-01T00:00:00")
 $SSH "sudo sh -c 'for f in \$(ls -tr /var/log/suricata/eve.json*); do zcat -f \"\$f\"; done' \
-      | jq -c --arg last '$LAST' 'select(.event_type==\"http\" and .timestamp > \$last) | {timestamp, src_ip, dest_ip, flow_id, http}'" \
+      | jq -cR --arg last '$LAST' 'fromjson? | select(.event_type==\"http\" and .dest_port==80 and .timestamp > \$last) | {timestamp, src_ip, dest_ip, flow_id, http}'" \
       > data/new.jsonl
 NEW=$(wc -l < data/new.jsonl)
 if [ "$NEW" -gt 0 ]; then
 	cat data/new.jsonl >> data/http.jsonl
-	jq -r .timestamp data/new.jsonl | sort | tail -1 > data/.last_ts
+	python3 -c "import json,sys; print(max(json.loads(l)[\"timestamp\"] for l in open(sys.argv[1])))" data/new.jsonl > data/.last_ts   # host has no jq
 fi
 rm -f data/new.jsonl
 $SSH "sudo cat /var/lib/lab-ml/data/labels.jsonl" > data/labels.jsonl

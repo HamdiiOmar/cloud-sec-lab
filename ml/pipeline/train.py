@@ -30,7 +30,7 @@ NORMAL_SRC = os.environ.get("NORMAL_SRC", "192.168.56.1")
 OPEN_WINDOW_MIN = int(os.environ.get("OPEN_WINDOW_MIN", "15"))   # cap for windows whose end never arrived
 TARGET_FPR = float(os.environ.get("TARGET_FPR", "0.005"))        # anomaly threshold = this quantile of normal
 MAX_FPR = float(os.environ.get("MAX_FPR", "0.01"))               # gate: test false positive rate
-MIN_NORMAL = int(os.environ.get("MIN_NORMAL", "2000"))
+MIN_NORMAL = int(os.environ.get("MIN_NORMAL", "10000"))   # too little data = rare legit actions look abnormal
 MIN_ATTACK_FOR_CLF = int(os.environ.get("MIN_ATTACK_FOR_CLF", "50"))
 MODEL_NAME = "lab-http-detector"
 
@@ -162,9 +162,17 @@ def main():
         if reasons:
             mlflow.set_tag("rejected_because", "; ".join(reasons))
 
-        mv = mlflow.register_model(f"runs:/{run.info.run_id}/bundle", MODEL_NAME)
+        # The bundle is a plain joblib file, not an MLflow "logged model", so register it with the
+        # low-level client (mlflow.register_model in MLflow 3 only accepts logged models).
+        client = mlflow.MlflowClient()
+        try:
+            client.create_registered_model(MODEL_NAME)
+        except mlflow.exceptions.MlflowException:
+            pass                                      # already exists
+        mv = client.create_model_version(MODEL_NAME, source=f"{run.info.artifact_uri}/bundle", run_id=run.info.run_id,
+                                         tags={"promoted": str(promoted).lower()})
         if promoted:
-            mlflow.MlflowClient().set_registered_model_alias(MODEL_NAME, "production", mv.version)
+            client.set_registered_model_alias(MODEL_NAME, "production", mv.version)
             os.replace(cand, os.path.join(OUT_DIR, "model.joblib"))
             print(f"PROMOTED {version} (registry v{mv.version})")
         else:

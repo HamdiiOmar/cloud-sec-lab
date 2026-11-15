@@ -14,3 +14,9 @@
   <log_format>json</log_format>
   <location>/var/log/suricata/eve-alerts.json</location>
 </localfile>
+
+<!-- Phase 5: ML scoring service verdicts -->
+<localfile>
+  <log_format>json</log_format>
+  <location>/var/lib/lab-ml/data/ml-alerts.json</location>
+</localfile>

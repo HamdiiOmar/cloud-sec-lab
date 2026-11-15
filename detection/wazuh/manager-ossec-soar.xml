@@ -9,11 +9,12 @@
 
 <!-- Forward correlation alerts to the Shuffle webhook (Wazuh's built-in "shuffle" integration).
      Only the aggregated rules, not every single WAF block: one sqlmap run is ~170 alerts.
-     100103 automated web attack, 100105 login brute force, 100111 port scan, 5763 SSH brute force.
+     100103 automated web attack, 100105 login brute force, 100111 port scan, 5763 SSH brute force,
+     100123 repeated ML detections (Phase 5).
      Replace the hook_url with the one printed by soar/shuffle/build_workflow.py. -->
 <integration>
   <name>shuffle</name>
   <hook_url>http://192.168.56.1:5001/api/v1/hooks/webhook_REPLACE_ME</hook_url>
-  <rule_id>100103,100105,100111,5763</rule_id>
+  <rule_id>100103,100105,100111,5763,100123</rule_id>
   <alert_format>json</alert_format>
 </integration>

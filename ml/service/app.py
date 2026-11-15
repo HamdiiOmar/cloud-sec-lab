@@ -27,6 +27,7 @@ ALERT_PATH = os.environ.get("ALERT_PATH", "/data/ml-alerts.json")
 LABELS_PATH = os.environ.get("LABELS_PATH", "/data/labels.jsonl")
 LABEL_TOKEN = os.environ.get("LABEL_TOKEN", "")
 ATTACK_PROBA = float(os.environ.get("ATTACK_PROBA", "0.8"))
+WEB_PORT = int(os.environ.get("WEB_PORT", "80"))
 SKIP_SOURCES = set(os.environ.get("SKIP_SOURCES", "").split(",")) - {""}
 
 SCORED = Counter("ml_events_scored_total", "HTTP requests scored")
@@ -122,8 +123,8 @@ def watcher():
             ev = json.loads(line)
         except ValueError:
             continue
-        if ev.get("src_ip") in SKIP_SOURCES:
-            continue
+        if ev.get("src_ip") in SKIP_SOURCES or ev.get("dest_port") != WEB_PORT:
+            continue                      # the model is trained on the web app (port 80) only
         with LATENCY.time():
             res = score(ev.get("http", {}))
         if res is None:

@@ -93,3 +93,47 @@
   </rule>
 
 </group>
+
+<!-- Phase 5: verdicts from the ML scoring service (ml/service), shipped from /var/lib/lab-ml/data/ml-alerts.json -->
+<group name="ml,lab_ml,">
+
+  <rule id="100120" level="5">
+    <decoded_as>json</decoded_as>
+    <field name="event_source">^lab-ml$</field>
+    <field name="ml.verdict">^anomaly$</field>
+    <description>ML: anomalous request from $(src_ip) to $(http.url) (score $(ml.anomaly_score))</description>
+    <group>ml_detection,</group>
+  </rule>
+
+  <rule id="100121" level="10">
+    <decoded_as>json</decoded_as>
+    <field name="event_source">^lab-ml$</field>
+    <field name="ml.verdict">^attack$</field>
+    <description>ML: request from $(src_ip) classified as $(ml.predicted_class) (p=$(ml.attack_proba))</description>
+    <group>ml_detection,</group>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- The case this layer exists for: the model flags it, the WAF signatures let it through -->
+  <rule id="100122" level="12">
+    <if_sid>100120,100121</if_sid>
+    <field name="waf_blocked">^false$</field>
+    <description>ML: suspicious request from $(src_ip) NOT blocked by the WAF: $(http.http_method) $(http.url)</description>
+    <group>ml_detection,</group>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <rule id="100123" level="12" frequency="5" timeframe="60">
+    <if_matched_group>ml_detection</if_matched_group>
+    <same_field>src_ip</same_field>
+    <description>ML: 5+ suspicious requests in 60s from $(src_ip)</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+</group>

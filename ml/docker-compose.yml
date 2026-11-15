@@ -35,6 +35,7 @@ services:
       OUT_DIR: /out
       NORMAL_SRC: 192.168.56.1
       HOME: /tmp
+      GIT_PYTHON_REFRESH: quiet        # no git in the image; silences MLflow's warning
     volumes:
       - ./data:/data:ro
       - ./models:/out
