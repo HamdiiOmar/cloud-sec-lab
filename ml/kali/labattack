@@ -12,8 +12,10 @@ API=${LAB_ML_API:-http://192.168.56.40:8000}
 TYPE=$1; shift
 SRC=$(ip -4 route get 192.168.56.40 | grep -oP 'src \K[\d.]+')
 
-ID=$(curl -sf -m 5 -X POST "$API/labels/start" -H "X-Label-Token: $LAB_TOKEN" -H 'Content-Type: application/json' \
-      -d "$(jq -nc --arg t "$TYPE" --arg s "$SRC" --arg c "$*" '{type:$t, src_ip:$s, command:$c}')" | jq -r .id)
+# python3 for JSON (Kali has no jq by default)
+BODY=$(python3 -c 'import json,sys; print(json.dumps({"type":sys.argv[1],"src_ip":sys.argv[2],"command":" ".join(sys.argv[3:])}))' "$TYPE" "$SRC" "$@")
+ID=$(curl -sf -m 5 -X POST "$API/labels/start" -H "X-Label-Token: $LAB_TOKEN" -H 'Content-Type: application/json' -d "$BODY" \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' 2>/dev/null)
 [ -n "$ID" ] && [ "$ID" != null ] || { echo "could not record the label start (ML service down?)"; exit 1; }
 echo "[labattack] window $ID started: type=$TYPE src=$SRC"
 
