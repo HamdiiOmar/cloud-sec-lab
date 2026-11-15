@@ -15,7 +15,7 @@ Attack it, watch it, detect it, block it, learn. Full architecture: [docs/cloud-
 1. **Lab base**: Compose + Wazuh up ✅
 2. **Signatures**: CRS + Suricata rules ✅
 3. **Health**: Prometheus, Grafana ✅
-4. **SOAR**: Shuffle blocks IPs
+4. **SOAR**: Shuffle blocks IPs ✅
 5. **ML loop**: train, score, retrain
 6. **DevSecOps**: CI scans, Terraform
 
@@ -97,5 +97,23 @@ Five alert rules (exporter down, high CPU, low memory, disk almost full, app con
 ![Prometheus alert rules](docs/screenshots/12-prometheus-rules.png)
 
 CPU uses busy ÷ total time rather than `100 - idle`: on this VirtualBox guest the CPU counters undercount, and the usual formula showed 50-80% for a VM that `top` showed at 2-4%.
+
+## Phase 4: SOAR (detect → decide → block → notify)
+
+Wazuh forwards correlation alerts to a Shuffle playbook. Shuffle extracts the attacker IP, calls the Wazuh API with a least-privilege user, and Wazuh Active Response adds the IP to an nftables block-list on the target for 10 minutes; then Shuffle posts to Discord. Details, design decisions and the problems fixed along the way: [docs/phase4-soar.md](docs/phase4-soar.md).
+
+nikto from Kali trips the WAF repeatedly:
+
+![nikto from Kali](docs/screenshots/14-kali-nikto.png)
+
+Within a minute Kali can no longer reach the target:
+
+![Kali blocked](docs/screenshots/15-kali-blocked.png)
+
+and the playbook reports it:
+
+![Discord notification](docs/screenshots/13-discord-blocked.png)
+
+Testing also surfaced a WAF false positive: Juice Shop's own `/socket.io/` polling from an open browser tab was blocked often enough to get Kali auto-blocked for normal browsing. Fixed with two narrow CRS exclusions ([infra/waf/](infra/waf/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf)).
 
 > Keep the lab on an isolated network. Only attack systems you own. Plan for ~16 GB RAM (Wazuh alone needs ~8 GB).
