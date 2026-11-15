@@ -20,6 +20,7 @@ services:
       BACKEND: http://juice-shop:3000
       BLOCKING_PARANOIA: 1                # CRS paranoia level (1 = fewest false positives)
       ANOMALY_INBOUND: 5                  # block when inbound anomaly score >= 5
+      ALLOWED_METHODS: "GET HEAD POST OPTIONS PUT PATCH DELETE"   # Juice Shop's REST API uses PUT/DELETE (CRS default blocks them, rule 911100)
       MODSEC_RULE_ENGINE: "on"            # "DetectionOnly" = log but don't block
       MODSEC_AUDIT_LOG: /var/log/modsecurity/audit.log  # default is stdout
       MODSEC_AUDIT_LOG_FORMAT: JSON

@@ -1,0 +1,17 @@
+# Phase 5: normal traffic, runs on the HOST so its source IP (192.168.56.1) marks it as benign.
+# Start: docker compose up -d     Stats UI: http://localhost:8089
+# ~5 users with 2-8 s think time = roughly 1-2 requests/second, around the clock.
+
+services:
+  locust:
+    image: locustio/locust:2.47.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8089:8089"
+    volumes:
+      - ./locustfile.py:/mnt/locust/locustfile.py:ro
+    command: >
+      -f /mnt/locust/locustfile.py
+      --host http://192.168.56.40
+      --users ${USERS:-5} --spawn-rate 1
+      --autostart
