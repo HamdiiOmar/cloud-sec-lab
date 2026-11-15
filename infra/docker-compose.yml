@@ -27,3 +27,4 @@ services:
       MODSEC_AUDIT_ENGINE: RelevantOnly   # only log 4xx (except 404) and 5xx
     volumes:
       - ./logs/modsecurity:/var/log/modsecurity   # host dir must be writable by uid 101
+      - ./waf/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:/etc/modsecurity.d/owasp-crs/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:ro

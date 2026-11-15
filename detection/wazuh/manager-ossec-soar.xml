@@ -3,14 +3,9 @@
   then: sudo systemctl restart wazuh-manager
 -->
 
-<!-- Active Response command Shuffle triggers through the Wazuh API (PUT /active-response, command "lab-block").
-     Runs /var/ossec/active-response/bin/lab-block.sh on the agent. No <active-response> block:
-     nothing blocks automatically, Shuffle decides. -->
-<command>
-  <name>lab-block</name>
-  <executable>lab-block.sh</executable>
-  <timeout_allowed>no</timeout_allowed>
-</command>
+<!-- No <command> block needed: Shuffle calls the Wazuh API with command "!lab-block.sh", which runs
+     /var/ossec/active-response/bin/lab-block.sh on the agent directly. (A named command only works through
+     the API when it also has an <active-response> block, which would make Wazuh block on its own.) -->
 
 <!-- Forward correlation alerts to the Shuffle webhook (Wazuh's built-in "shuffle" integration).
      Only the aggregated rules, not every single WAF block: one sqlmap run is ~170 alerts.

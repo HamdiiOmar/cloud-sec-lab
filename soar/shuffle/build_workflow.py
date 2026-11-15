@@ -110,7 +110,7 @@ def build():
     block = action("block_ip", "http", "PUT", 800, {
         "url": f"{WAZUH_API}/active-response?agents_list={TARGET_AGENT}",
         "headers": "Content-Type: application/json\nAuthorization: Bearer $wazuh_login.body",
-        "body": json.dumps({"command": "lab-block",
+        "body": json.dumps({"command": "!lab-block.sh",
                             "arguments": ["$parse_alert.message.ip", BAN_MINUTES]}),
         "verify": "false",
     })
