@@ -28,8 +28,8 @@ DATA_DIR = os.environ.get("DATA_DIR", "/data")
 OUT_DIR = os.environ.get("OUT_DIR", "/out")
 NORMAL_SRC = os.environ.get("NORMAL_SRC", "192.168.56.1")
 OPEN_WINDOW_MIN = int(os.environ.get("OPEN_WINDOW_MIN", "15"))   # cap for windows whose end never arrived
-TARGET_FPR = float(os.environ.get("TARGET_FPR", "0.005"))        # anomaly threshold = this quantile of normal
-MAX_FPR = float(os.environ.get("MAX_FPR", "0.01"))               # gate: test false positive rate
+TARGET_FPR = float(os.environ.get("TARGET_FPR", "0.002"))        # anomaly threshold = this quantile of normal
+MAX_FPR = float(os.environ.get("MAX_FPR", "0.005"))               # gate: test false positive rate
 MIN_NORMAL = int(os.environ.get("MIN_NORMAL", "10000"))   # too little data = rare legit actions look abnormal
 MIN_ATTACK_FOR_CLF = int(os.environ.get("MIN_ATTACK_FOR_CLF", "50"))
 MODEL_NAME = "lab-http-detector"
@@ -55,8 +55,17 @@ def load_windows():
     return out
 
 
+# Columns that mean "this request carries an attack payload" (in URL or in a header).
+SIGNAL_COLS = [c for c in FEATURE_NAMES if c.startswith(("kw_", "hdr_kw_", "hdr_special"))] + \
+    ["dotdot", "dash_dash", "c_lt", "c_gt", "c_quote", "c_semicolon", "c_pipe", "c_backtick", "c_dollar", "c_star"]
+
+
+def attack_signal(f):
+    return sum(f.get(c, 0) for c in SIGNAL_COLS)
+
+
 def load_events(windows):
-    rows = []
+    rows, dropped_benign = [], 0
     for line in open(os.path.join(DATA_DIR, "http.jsonl")):
         ev = json.loads(line)
         src, t = ev.get("src_ip"), ts(ev["timestamp"])
@@ -70,8 +79,15 @@ def load_events(windows):
         if "request_headers" not in ev.get("http", {}):
             continue      # v3 features need the request headers (logged since Phase 5); older events can't show header attacks
         f = extract(ev.get("http", {}))
+        # Attack tools (sqlmap, nikto) send many benign baseline requests mixed with their payloads. Those
+        # carry no attack signal, so labeling them as the attack poisons the classifier (it then flags any
+        # non-Locust-shaped request). Keep an attack-labeled request only if it actually carries a payload.
+        if label != "normal" and attack_signal(f) == 0:
+            dropped_benign += 1
+            continue
         f.update(_label=label, _time=t, _src=src)
         rows.append(f)
+    print(f"dropped {dropped_benign} attacker requests with no payload (tool baseline traffic)")
     return pd.DataFrame(rows)
 
 

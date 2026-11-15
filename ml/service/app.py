@@ -27,6 +27,7 @@ ALERT_PATH = os.environ.get("ALERT_PATH", "/data/ml-alerts.json")
 LABELS_PATH = os.environ.get("LABELS_PATH", "/data/labels.jsonl")
 LABEL_TOKEN = os.environ.get("LABEL_TOKEN", "")
 ATTACK_PROBA = float(os.environ.get("ATTACK_PROBA", "0.8"))
+ANOMALY_MIN_PROBA = float(os.environ.get("ANOMALY_MIN_PROBA", "0.5"))
 WEB_PORT = int(os.environ.get("WEB_PORT", "80"))
 SKIP_SOURCES = set(os.environ.get("SKIP_SOURCES", "").split(",")) - {""}
 
@@ -84,7 +85,15 @@ def score(http: dict) -> dict | None:
         out.update(attack_proba=round(p_attack, 4), predicted_class=classes[best])
     else:
         p_attack = 0.0
-    out["verdict"] = ("attack" if p_attack >= ATTACK_PROBA else "anomaly" if out["is_anomaly"] else "normal")
+    # Verdict: the classifier decides "attack"; an "anomaly" needs BOTH the unsupervised flag and the
+    # classifier being at least unsure (p_attack >= ANOMALY_MIN_PROBA), so rare-but-legit requests the
+    # IsolationForest flags (e.g. writing a review) are vetoed instead of alerting.
+    if p_attack >= ATTACK_PROBA:
+        out["verdict"] = "attack"
+    elif out["is_anomaly"] and p_attack >= ANOMALY_MIN_PROBA:
+        out["verdict"] = "anomaly"
+    else:
+        out["verdict"] = "normal"
     out["top_features"] = {k: v for k, v in feats.items() if k.startswith(("kw_", "c_", "ua_tool", "dotdot")) and v}
     return out
 

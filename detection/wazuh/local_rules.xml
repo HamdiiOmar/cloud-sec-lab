@@ -118,7 +118,7 @@
 
   <!-- The case this layer exists for: the model flags it, the WAF signatures let it through -->
   <rule id="100122" level="12">
-    <if_sid>100120,100121</if_sid>
+    <if_sid>100121</if_sid>
     <field name="waf_blocked">^false$</field>
     <description>ML: suspicious request from $(src_ip) NOT blocked by the WAF: $(http.http_method) $(http.url)</description>
     <group>ml_detection,</group>
