@@ -16,7 +16,7 @@ Attack it, watch it, detect it, block it, learn. Full architecture: [docs/cloud-
 2. **Signatures**: CRS + Suricata rules ✅
 3. **Health**: Prometheus, Grafana ✅
 4. **SOAR**: Shuffle blocks IPs ✅
-5. **ML loop**: train, score, retrain
+5. **ML loop**: train, score, retrain ✅
 6. **DevSecOps**: CI scans, Terraform
 
 ## Lab
@@ -115,5 +115,17 @@ and the playbook reports it:
 ![Discord notification](docs/screenshots/13-discord-blocked.png)
 
 Testing also surfaced a WAF false positive: Juice Shop's own `/socket.io/` polling from an open browser tab was blocked often enough to get Kali auto-blocked for normal browsing. Fixed with two narrow CRS exclusions ([infra/waf/](infra/waf/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf)).
+
+## Phase 5: ML detection (what the signatures miss)
+
+A scoring service on the target reads every web request Suricata sees (URL and request headers) and runs two models trained on this lab's own traffic: a Random Forest classifier and an Isolation Forest anomaly detector. Normal traffic comes from a Locust load generator; attacks are recorded from Kali as labeled time windows. Training, metrics and model versions are tracked in MLflow, a model is promoted only if it passes quality gates, and verdicts flow into Wazuh (rules 100120-100123) and from there to Shuffle. Details: [docs/phase5-ml.md](docs/phase5-ml.md).
+
+| Measured on real logged traffic | Result |
+|---|---|
+| Normal requests flagged | 0 / 120 |
+| Attack requests carrying a payload, caught | 100%, including SQLi/XSS hidden in headers |
+| Header SQLi the WAF lets through (HTTP 200) | caught, raised as Wazuh rule 100122 |
+
+What made it work was mostly debugging the data, not the model: Prometheus scrapes in the "normal" set, encoded spaces flagging normal searches, a classifier using user-agent length as a shortcut, and label noise from attack tools' benign baseline traffic. That last one produced a test F1 of 0.995 for a model that flagged every non-Locust request as SQLi, and was only caught by scoring real logged traffic.
 
 > Keep the lab on an isolated network. Only attack systems you own. Plan for ~16 GB RAM (Wazuh alone needs ~8 GB).
